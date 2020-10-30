@@ -8,8 +8,52 @@
 #include <sys/wait.h>
 
 
+void showCommand();
+void execute(char** argv);
+char* r_line();
+char* parseLine(char* line);
+char* builtInCmd[] = {"exit","cd","status"};
+
+int main()
+{	
+	char* arr;
+	showCommand();
+	arr = r_line();
+	parseLine(arr);
+	return 0;
+}
 
 
+//Takes in a buffer and creates tokens for arguements. Will be used to compare with buildInCMD
+char* parseLine(char* line)
+{
+	
+	char** arg = malloc(512  * sizeof(char*));
+	char* token = strtok(line," ");
+	int i = 0;
+	while(token != NULL)
+	{
+		arg[i] = token;
+		token = strtok(NULL," ");
+		printf("%s\n",arg[i]);
+		i++;
+	}	
+	
+	return *arg;
+}
+//Reads in the line and stores it in a buffer then returns it.
+char* r_line()
+{
+	char* bLine = NULL;
+	ssize_t buffer = 2046;
+	
+	if(getline(&bLine,&buffer,stdin) != -1 )
+	{
+		perror("reading line");
+	}
+	return bLine;
+		
+}
 void showCommand()
 {
   // clears the screen to show the prompt of the shell
@@ -23,7 +67,7 @@ void showCommand()
     printf(":");
 
 }
-void execute(char* argv)
+void execute(char** argv)
 {
   if (execvp(*argv, argv) < 0)
   {
@@ -32,25 +76,4 @@ void execute(char* argv)
   }
 }
 
-int main()
-{
-  pid_t spawnPid = -5;
-  int childExitMethod = -5;
-  spawnPid = fork();
-  if (spawnPid == -1) //
-    {
-      perror("Hull Breach!\n");
-      exit(1);
-    }
-  else if (spawnPid == 0) // Terminate the child process immediately
-  {
-    printf("CHILD: PID: %d, exiting!\n", spawnPid);
-    exit(0);
-  }
-  printf("PARENT: PID: %d, waiting...\n", spawnPid);
-  waitpid(spawnPid, &childExitMethod, 0);
-  printf("PARENT: Child process terminated, exiting!\n");
-  exit(0);
-
-
-}
+	
