@@ -14,14 +14,11 @@ void showCommand();
 void execute(char** argv);
 char* r_line();
 struct Command  *parseLine(char* line);
-int cd(char** arg);
-int shExit(char** arg);
-int shStatus(char** arg);
 char* builtInCmd[] = {"#","exit","status","cd"};
 int processBuilt(struct Command *x);
-void cd();
-void ex();
+void cd(struct Command *x);
 void sta();
+void bg(struct Command *x);
 
 struct Command
 {
@@ -41,10 +38,55 @@ int main()
 }
 
 
+//checks the background by comparing last argument in array to &
+void bg(struct Command *x)
+{	
+	char s [50];
+	int j = 0;
+	int i = 0;
+	while(x->ar[i] != NULL)
+	{
+		i++;
+	}
+	strcpy(s,x->ar[i-1]);
+	j = strlen(s);
+	s[j-1] = 0;	
+	if(strcmp(s,"&")== 0)
+	{	
+		x->bg = true;
+	}
+}
+void sta()
+{
+	
+} 
+
+//Changes back directory or moves to a new one
+void cd(struct Command *x)
+{
+	char newFilePath[50];
+	ssize_t buf = 2046;
+	
+	if(x->ar[1] == NULL)
+	{	
+
+		chdir("..");
+		
+	}
+	else
+	{	
+		//only checks first parameter
+		sprintf(newFilePath,"/%s",x->ar[1]);
+		chdir(newFilePath);	
+	}	
+	
+		
+	
+}
 //Takes in the struct to check global commands and # then returns int for next step
 int processBuilt(struct Command *x)
 {	
-
+	printf("%s %s %s",x->ar[0],x->ar[1],x->ar[2]);
 	struct Command *temp = x;
 	if(strcmp(x->com,builtInCmd[0] ) == 0)
 	{	
@@ -53,6 +95,7 @@ int processBuilt(struct Command *x)
 
 	if(strcmp(x->com,builtInCmd[1] ) == 0)
 	{
+		exit(1);
 		return 2;
 	}
 
@@ -79,23 +122,6 @@ void sighandler(int signum)
 }
 
 
-int shExit(char** arg)
-{
-	return 0;	
-
-}
-int cd(char** arg)
-{
-	if(builtInCmd[1] == NULL)
-	{
-		fprintf(stderr,": cd function not recognized\n");
-	}
-
-	return 1;
-}
-
-
-
 
 
 void processCMD()
@@ -109,7 +135,9 @@ void processCMD()
 		showCommand();
 		line = r_line();
 		cmd  = parseLine(line);
-		processBuilt(cmd);	
+		processBuilt(cmd);
+		bg(cmd);
+		cd(cmd);	
 	}
 		
 }
@@ -130,22 +158,28 @@ struct Command *parseLine(char* line)
 	
 		currCommand->ar[i] = calloc(strlen(token)+1,sizeof(char));	
 		strcpy(currCommand->ar[i], token);
-		s = strlen(currCommand->ar[i]);
-		currCommand->ar[i][s-1] = 0;
+
 		if(strcmp(currCommand->ar[i], "<") == 0)
 		{
 			currCommand->inp = true;
+			free(currCommand->ar[i]);
+			i--;
 		}
-		if(strcmp(currCommand->ar[i], ">") == 0)
+		else if(strcmp(currCommand->ar[i], ">") == 0)
 		{
 			currCommand->out = true;
+			free(currCommand->ar[i]);
+			i--;
+	
 		}
 		
-		if(strcmp(currCommand->ar[i], "&") == 0)
-		{	
-			currCommand->bg = true;
-		}
-			token = strtok(NULL," ");	
+	//	else if(strcmp(currCommand->ar[i], "&") == 0)
+	//	{	
+	//		currCommand->bg = true;
+	//		free(currCommand->ar[i]);
+	//		i--;			
+	//	}
+		token = strtok(NULL," ");	
 		i++;
 	}
 	
