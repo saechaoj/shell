@@ -22,13 +22,10 @@ void sta();
 void bg(struct Command *x);
 int io(struct Command *x);
 void processIO(struct Command *x,int i);
-
-
 void signalFunc();
-
-int global_fg = 0;
-
-
+void toggleFG(int);
+int globalFG;
+char* str_replace(char* x,char[],char* z);
 
 
 struct Command
@@ -47,35 +44,100 @@ struct Command
 
 
 
-struct Node
-{
-	int pid;
-	struct Node* next;
-};
-
-
 
 
 int main()
 {
+	struct sigaction SIGINT_action = {0},SIGTSTP_action = {0}, ignore_action = {0};
+
+	SIGTSTP_action.sa_handler = toggleFG;
+	sigfillset(&SIGTSTP_action.sa_mask);
+	SIGTSTP_action.sa_flags = SA_RESTART;
+	sigaction(SIGTSTP,&SIGTSTP_action,NULL);	
+
+
+
+
 
 	processCMD();
+
+
 	return 0;
 }
 
 
 
-
-
-
-void signalFunc()
+// Replaces $$ with PID and keeps chars that arent $$
+char* str_replace(char* x,char* y,char* z)
 {
+	char buffer[1024] = { 0 };
+        char *insert_point = &buffer[0];
+        const char *tmp = x;
+        size_t needle_len = strlen(y);
+        size_t repl_len = strlen(z);
 
+	while(1)
+	{
+		const char*p =strstr(tmp,y);
+
+		if (p == NULL) 
+		{
+           	 	strcpy(insert_point, tmp);
+          	 	break;
+      		}
+
+
+		memcpy(insert_point, tmp, p - tmp);
+       		insert_point += p - tmp;
+
+		memcpy(insert_point, z, repl_len);
+        	insert_point = insert_point + repl_len;
+
+		tmp = p + needle_len;
+	}
+
+	strcpy(x,buffer);
+	return x;
+  
 }
 
 
 
-//sets input and output
+//handles the sign number
+void sighandler(int signum)
+{
+	char* message = " Signal 2 Caught\n";
+	write(STDOUT_FILENO, message, 39);
+	
+}
+
+
+//FG handler catches signal then changes global var so & is ignored
+void toggleFG(int signum)
+{
+	if (globalFG == 1)
+ 	{
+		char* message = " Foreground only mode EXIT\n:";
+ 		write(STDOUT_FILENO, message, 28);
+		globalFG = 0;
+		fflush(stdout);
+ 
+	}
+	else
+	{
+		char* message = " Foreground only mode ACTIVATED\n:";
+		write(STDOUT_FILENO, message, 33);
+		globalFG = 1;
+		fflush(stdout);
+ 	}
+}
+
+
+
+
+
+
+//takes in  integer to process input or out
 void proccessIO(struct Command *x, int i)
 {
 	printf("made it here\n");
@@ -267,6 +329,10 @@ void bg(struct Command *x)
 		x->ar[i-1] = NULL;
 		free(x->ar[i-1]);
 	}
+	if(globalFG == 1)
+	{
+		x->bg = false;
+	}
 }
 
 
@@ -282,17 +348,16 @@ void sta()
 
 
 
-//Changes back directory or moves to a new one ** need home envirement and check file in dir
+//Changes back to home envirment directory or moves to a new one 
 void cd(struct Command *x)
 {	
 
-	//**** Need to get home envirement and check for file in dir
-	char newFilePath[50];
+	char newFilePath[250];
 	ssize_t buf = 2046;
 	
 	if(x->ar[1] == NULL)
-	{	
-		chdir("..");
+	{	strcpy(newFilePath,getenv("HOME"));
+		chdir(newFilePath);
 		
 	}
 	else
@@ -311,26 +376,36 @@ void cd(struct Command *x)
 
 
 
-//Takes in the struct to check global commands and # then returns int for next step
+//Takes in the struct to check global built in commands and # , then returns int to process built in
 int processBuilt(struct Command *x)
-{	
-	if(strcmp(x->com,builtInCmd[0] ) == 0)
+{
+	char str[50];
+	
+	int len = strlen(x->com);
+	strcpy(str, x->com);
+	len = strlen(str);
+
+	if(str[len-1] == '\n')
+	{
+		 str[len-1] = 0;
+	}
+	if(strcmp(str,builtInCmd[0] ) == 0)
 	{	
 		return 1;
 	}
 
-	if(strcmp(x->com,builtInCmd[1] ) == 0)
+	if(strcmp(str,builtInCmd[1] ) == 0)
 	{
 		return 2;
 	}
 
 	
-	if(strcmp(x->com,builtInCmd[2] ) == 0)
+	if(strcmp(str,builtInCmd[2] ) == 0)
 	{
 		return 3;
 	}
 
-	if(strcmp(x->com,builtInCmd[3] ) == 0)
+	if(strcmp(str,builtInCmd[3] ) == 0)
 	{
 		return 4;
 	}	
@@ -346,25 +421,14 @@ int processBuilt(struct Command *x)
 
 
 
-
-//handles the sign number
-void sighandler(int signum)
-{
-	char* message = "Caught SigInt, sleeping for 10 seconds\n";
-	write(STDOUT_FILENO, message, 39);
-	sleep(10);
-}
-
-
-
-
+//Runs shell
 void processCMD()
 {	
 	int pb = 0;	
 	int counter = 0;
 	struct Command *cmd;
 	char* line;
-	
+	globalFG = 0;	
 
 	while(counter == 0)
 	{	
@@ -372,54 +436,60 @@ void processCMD()
 
 		showCommand();
 		line = r_line();
-		cmd = parseLine(line);
-		pb = processBuilt(cmd);
-		bg(cmd);
-		printf("PID : %d\n", getpid);
- 		printf("My parent's pid is %d\n", getppid());
-		if(pb == 5)
+		
+		// for toggle z control
+		if(strlen(line) != 0)
 		{
-			int i = io(cmd);
-			if(i == 0)
+			
+			
+			cmd = parseLine(line);
+			pb = processBuilt(cmd);
+			bg(cmd);
+			printf("PID : %d\n", getpid());
+			printf("My parent's pid is %d\n", getppid());
+			printf("%d", pb);
+
+			if(pb == 5)
 			{
-				// fork run exe , must wait till child terminates
+				int i = io(cmd);
+				if(i == 0)
+				{
+					// fork run exe , must wait till child terminates
+				}
+
+				else if(i == 2)
+				{
+					proccessIO(cmd,2);
+
+					//do in or out then fork ex
+				}
+
+				else if(i == 3)
+				{	
+					proccessIO(cmd,3);
+				}
+
 			}
 
-			else if(i == 2)
+
+			else if(pb == 4)
 			{
-				proccessIO(cmd,2);
+				cd(cmd);
 
-				//do in or out then fork ex
 			}
-
-			else if(i == 3)
+			else if(pb == 3)
 			{	
-				proccessIO(cmd,3);
+				sta();
+			}
+			else if(pb == 2)
+			{	
+				exit(1);
+			}
+			else if(pb == 1)
+			{
+				printf("");
 			}
 
-		}
-
-
-		else if(pb == 4)
-		{
-			// Changes directory
-			cd(cmd);
-
-		}
-		else if(pb == 3)
-		{	
-			// Status
-			sta();
-		}
-		else if(pb == 2)
-		{	
-			// Exit, when fork save process ID like in a linked list. run thru kill process
-			exit(1);
-		}
-		else if(pb == 1)
-		{
-			// # Symbol
-			printf("");
 		}
 		
 	}
@@ -427,7 +497,9 @@ void processCMD()
 }
 
 
-//Takes in a buffer and creates tokens for arguements. Will be used to compare with buildInCMD
+//Takes in a buffer and creates tokens for arguements. Com will be used to compare with buildInCMD
+//Didthe first malloc because I mis understood direction 
+
 struct Command *parseLine(char* line)
 {
 	
@@ -435,10 +507,18 @@ struct Command *parseLine(char* line)
 	char* token = strtok(line," ");
 	currCommand->com = calloc(strlen(token)+1,sizeof(char));
 	strcpy(currCommand->com,token);
-//	int s = strlen(currCommand->com);
-//	currCommand->com[s-1] = 0;
 	int i = 0;
 	size_t n;
+	
+	// for $$
+	char substr[]= "$$";
+	int p = getpid();
+	char* pp;
+	pp = calloc(20,sizeof(char));
+	sprintf(pp,"%d",p);
+	int substr_size = strlen(pp);
+	char* ptr;
+	char* ptr2;
 
 
 	while(token != NULL)
@@ -447,7 +527,10 @@ struct Command *parseLine(char* line)
 		currCommand->ar[i] = calloc(strlen(token)+1,sizeof(char));	
 		strcpy(currCommand->ar[i], token);
 
-		//checks input and output then sets boolean and index
+		ptr = calloc(strlen(currCommand->ar[i])+100, sizeof(char));
+		strcpy(ptr,currCommand->ar[i]);
+		ptr2 = strstr(ptr,substr);	
+	
 		if(strcmp(currCommand->ar[i], "<") == 0)
 		{
 			currCommand->inp = i;
@@ -458,6 +541,20 @@ struct Command *parseLine(char* line)
 			currCommand->out = i;
 			currCommand->bo = true;
 	
+		}
+		else if(ptr2 != NULL)
+		{	
+			currCommand->ar[i] = NULL;
+			free(currCommand->ar[i]);
+		
+			str_replace(ptr,substr,pp);
+			
+			currCommand->ar[i] = calloc(strlen(ptr)+1,sizeof(char));
+			strcpy(currCommand->ar[i],ptr);
+			
+			ptr = NULL;
+			free(ptr);
+
 		}
 		
 		token = strtok(NULL," ");	
@@ -476,7 +573,6 @@ char* r_line()
 {
 	char* bLine = NULL;
 	ssize_t buffer = 2046;
-	
 	if(getline(&bLine,&buffer,stdin) == -1 )
 	{
 		perror("reading line");
