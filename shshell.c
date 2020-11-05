@@ -27,6 +27,7 @@ void toggleFG(int);
 int globalFG;
 char* str_replace(char* x,char[],char* z);
 
+void newProcess(struct Command *x);
 
 struct Command
 {
@@ -57,13 +58,57 @@ int main()
 
 
 
-
-
 	processCMD();
 
 
 	return 0;
 }
+
+
+
+
+
+void newProcess(struct Command *x)
+{
+	pid_t child = -5;
+	pid_t child2 = -5;
+
+	int childStatus;
+	int childStatus2;
+
+	child = fork();
+	switch(child)
+	{
+		case -1:
+			perror("fork() failed!");
+			exit(1);
+			break;
+	
+		case 0:
+			printf("Child PID : %d\n", getpid());
+			
+			execvp("shell",x->ar);	
+			perror("execvp");
+			exit(2);
+			break;	
+	
+
+		default:
+
+			child = waitpid(child,&childStatus,0);
+			if(WIFEXITED(childStatus))
+			{
+				printf("Child exited normally with status %d\n", child,WEXITSTATUS(childStatus));
+			}
+			
+			break;
+		
+	}	
+
+	//both run here
+}
+
+
 
 
 
@@ -356,8 +401,12 @@ void cd(struct Command *x)
 	ssize_t buf = 2046;
 	
 	if(x->ar[1] == NULL)
-	{	strcpy(newFilePath,getenv("HOME"));
-		chdir(newFilePath);
+	{	
+		strcpy(newFilePath,getenv("HOME"));
+		if(chdir(newFilePath) == -1)
+		{
+			perror("Home");
+		}
 		
 	}
 	else
@@ -454,7 +503,7 @@ void processCMD()
 				int i = io(cmd);
 				if(i == 0)
 				{
-					// fork run exe , must wait till child terminates
+					newProcess(cmd);
 				}
 
 				else if(i == 2)
