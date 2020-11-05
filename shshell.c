@@ -21,6 +21,12 @@ void cd(struct Command *x);
 void sta();
 void bg(struct Command *x);
 int io(struct Command *x);
+void processIO(struct Command *x,int i);
+
+
+void signalFunc();
+
+int global_fg = 0;
 
 
 
@@ -34,6 +40,8 @@ struct Command
 	int out;
 	bool bi;
 	bool bo;
+	char* input;
+	char* output;
 
 };
 
@@ -59,53 +67,170 @@ int main()
 
 
 
+
+void signalFunc()
+{
+
+}
+
+
+
+//sets input and output
+void proccessIO(struct Command *x, int i)
+{
+	printf("made it here\n");
+	char* def = "/dev/null";
+	if(i == 3)
+	{
+      
+	 
+		 int sourceFD = open(x->input, O_RDONLY);
+ 		 if (sourceFD == -1)
+		 { 
+      			perror("source open()"); 
+    	 	 }
+
+		  int result = dup2(sourceFD, 0);
+	 	 if (result == -1) 
+	         { 
+  			  perror("source dup2()"); 
+		 }
+	
+
+		
+
+
+		int targetFD = open(x->output, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  		if (targetFD == -1) 
+		{ 
+   			 perror("target open()"); 
+ 		 }
+  		 result = dup2(targetFD, 1);
+ 		if (result == -1) 
+		{ 
+    			perror("target dup2()"); 
+		}
+	}
+	
+
+	else if(x->output == NULL)
+	{
+
+
+	 int sourceFD = open(x->input, O_RDONLY);
+ 		 if (sourceFD == -1)
+		 { 
+      			perror("source open()"); 
+      			 
+  		}
+
+		  int result = dup2(sourceFD, 0);
+	 	 if (result == -1) 
+		{ 
+  			  perror("source dup2()"); 
+   			 
+		  }
+
+	}
+
+
+	else if(x->input == NULL)
+	{
+
+
+		int targetFD = open(x->output, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  			if (targetFD == -1) 
+			{ 
+   				 perror("target open()"); 
+   				 exit(1); 
+ 			 }
+  			int result = dup2(targetFD, 1);
+ 			if (result == -1) 
+			{ 
+    				perror("target dup2()"); 
+	    			exit(2); 
+			  }
+
+
+	}
+
+
+
+}
+
+
+
+
+
 // Takes out the < and/or > then replaces it with file commands then return number of arguements.
 int io(struct Command *x)
 {
-	// loop through and find the < or > on else it****	
+	int j = 0;	
+	int i = 0;
+	char* star;
+
+
 	if(x->bi ==1 && x->bo ==1)
 	{
 
+
+		x->input= calloc(strlen(x->ar[x->inp+1])+1,sizeof(char));
+		x->output= calloc(strlen(x->ar[x->out+1])+1,sizeof(char));
+
+		x->output = x->ar[x->out+1];
+		x->input = x->ar[x->out+1];
 		x->ar[x->inp] = NULL;
 		x->ar[x->out] = NULL;
+
+
+
 	
-		free(x->ar[x->inp]);
-		free(x->ar[x->out]);
-
-
-		x->ar[x->inp] = calloc(strlen(x->ar[x->inp + 1]) + 1 ,sizeof(char));
-		strcpy(x->ar[x->inp],x->ar[x->inp+1]);
-
-		x->ar[x->out-1] = calloc(strlen(x->ar[x->out + 1]) + 1 ,sizeof(char));
-
-		strcpy(x->ar[x->out-1],x->ar[x->out+1]);
-
-		
 		x->ar[x->out+1] = NULL;
-		free(x->ar[x->out+1]);
+		x->ar[x->inp+1] = NULL;
 		
 		return 3;
 
 	}
 
 
-	if( x->bi == 1 || x->bo == 1)
+
+	else if( x->bi == 1 || x->bo == 1)
 	{
-		int i = 0;
+		i = 0;
 
 		while(x->ar[i] != NULL)
 		{
-
-			if(strcmp(x->ar[i],"<") == 0 || strcmp(x->ar[i],">") == 0)
+			if(strcmp(x->ar[i],">") == 0)
 			{
 				x->ar[i] = NULL;
-				free(x->ar[i]);
-				x->ar[i] = calloc(strlen(x->ar[i+1]) + 1 ,sizeof(char));
-				strcpy(x->ar[i],x->ar[i+1]);
+				x->output= calloc(strlen(x->ar[i+1])+1,sizeof(char));
+				x->output = x->ar[i+1];
 				x->ar[i+1] = NULL;
+				free(x->ar[i]);
 				free(x->ar[i+1]);
-			
+				x->input = NULL;
+				break;
+		
 			}
+
+
+
+			if(strcmp(x->ar[i],"<") == 0)
+			{
+				x->ar[i] = NULL;
+				x->input = calloc(strlen(x->ar[i+1])+1,sizeof(char));
+				x->input = x->ar[i+1];
+				x->ar[i+1] = NULL;
+				free(x->ar[i]);
+				free(x->ar[i+1]);
+				x->output = NULL;
+				break;
+		
+			}
+
+
+
+
 			i++;
 		}		
 	
@@ -189,7 +314,6 @@ void cd(struct Command *x)
 //Takes in the struct to check global commands and # then returns int for next step
 int processBuilt(struct Command *x)
 {	
-	printf("%s\n", x->com);
 	if(strcmp(x->com,builtInCmd[0] ) == 0)
 	{	
 		return 1;
@@ -250,25 +374,27 @@ void processCMD()
 		line = r_line();
 		cmd = parseLine(line);
 		pb = processBuilt(cmd);
-		
+		bg(cmd);
+		printf("PID : %d\n", getpid);
+ 		printf("My parent's pid is %d\n", getppid());
 		if(pb == 5)
 		{
-			
-			bg(cmd);
-
-			if(io(cmd) == 0)
+			int i = io(cmd);
+			if(i == 0)
 			{
-				// fork run exe
+				// fork run exe , must wait till child terminates
 			}
 
-			else if(io(cmd) == 2)
+			else if(i == 2)
 			{
+				proccessIO(cmd,2);
+
 				//do in or out then fork ex
 			}
 
-			else if(io(cmd) == 3)
-			{
-				//do both fork then exe
+			else if(i == 3)
+			{	
+				proccessIO(cmd,3);
 			}
 
 		}
@@ -309,10 +435,12 @@ struct Command *parseLine(char* line)
 	char* token = strtok(line," ");
 	currCommand->com = calloc(strlen(token)+1,sizeof(char));
 	strcpy(currCommand->com,token);
-	int s = strlen(currCommand->com);
-	currCommand->com[s-1] = 0;
+//	int s = strlen(currCommand->com);
+//	currCommand->com[s-1] = 0;
 	int i = 0;
 	size_t n;
+
+
 	while(token != NULL)
 	{	
 	
