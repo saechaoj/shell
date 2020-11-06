@@ -82,8 +82,11 @@ void newProcess(struct Command *x)
 	}
 	int len = strlen(x->ar[j-1]);
 
-	x->ar[j-1][len-1] = '\0';
+	if(x->ar[j-1][len-1] == '\n')
+	{
 
+		x->ar[j-1][len-1] = '\0';
+	}
 
 	int childStatus;
 	int childStatus2;
@@ -99,8 +102,16 @@ void newProcess(struct Command *x)
 		case 0:
 		//	printf("Child PID : %d\n", getpid());
 			
-		
-			execute(x->ar);
+			if(x->bg == true)
+			{
+				execute(x->ar);
+				sleep(10);	
+			}
+			else
+			{
+				execute(x->ar);
+			
+			}
 
 			break;	
 	
@@ -112,20 +123,26 @@ void newProcess(struct Command *x)
 
 			printf("Background process started with PID %d\n", child);
 			fflush(stdout);
-
-
-
-		}
-			child = waitpid(child,&childStatus,0);
-			if(!WIFEXITED(childStatus))
+			
+			if(WIFEXITED(childStatus))
 			{
 				printf("Child exited normally with status %d\n", child,WEXITSTATUS(childStatus));
 				fflush(stdout);
 			}
 
 			
-			
+
+
+		 }
+
+		else
+		{
+
+			child = waitpid(child,&childStatus,0);
 			break;
+
+		}
+		
 		
 	}	
 
@@ -179,6 +196,9 @@ void sighandler(int signum)
 	write(STDOUT_FILENO, message, 39);
 	fflush(stdout);
 }
+
+
+
 
 
 //FG handler catches signal then changes global var so & is ignored
@@ -437,10 +457,15 @@ void cd(struct Command *x)
 	}
 	else
 	{	
+		int l = strlen(x->ar[1]);
+		x->ar[1][l-1] = '\0';
 		sprintf(newFilePath,"/%s",x->ar[1]);
+		
+		printf("%s Working dir", newFilePath);
 		if(chdir(newFilePath) == -1)
 		{
 			perror("error");
+			exit(1);
 		}
 	}	
 	
@@ -499,12 +524,13 @@ int processBuilt(struct Command *x)
 //Runs shell
 void processCMD()
 {	
+
+	
 	int pb = 0;	
 	int counter = 0;
 	struct Command *cmd;
-	char* line;
-	globalFG = 0;	
-
+	char* line;	
+	globalFG = 0;
 	char* kill[50];
 	int c = 0;
 
@@ -525,7 +551,6 @@ void processCMD()
 			cmd = parseLine(line);
 			pb = processBuilt(cmd);
 			bg(cmd);
-			printf("PID : %d\n", getpid());
 			fflush(stdout);
 
 			if(pb == 5)
@@ -539,12 +564,13 @@ void processCMD()
 				else if(i == 2)
 				{
 					proccessIO(cmd,2);
-
+					newProcess(cmd);
 				}
 
 				else if(i == 3)
 				{	
 					proccessIO(cmd,3);
+					newProcess(cmd);
 				}
 
 			}
@@ -683,7 +709,7 @@ void execute(char** argv)
 {
   if (execvp(*argv, argv) < 0)
   {
-    perror("Exec failure!\n");
+    printf("Command not found\n");
 	fflush(stdout);
     exit(1);
   }
