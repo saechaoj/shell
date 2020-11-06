@@ -29,6 +29,7 @@ char* str_replace(char* x,char[],char* z);
 
 void newProcess(struct Command *x);
 
+
 struct Command
 {
 	char* com;
@@ -73,33 +74,56 @@ void newProcess(struct Command *x)
 	pid_t child = -5;
 	pid_t child2 = -5;
 
+	int j = 0;
+	while(x->ar[j] != NULL)
+	{
+
+		j++;
+	}
+	int len = strlen(x->ar[j-1]);
+
+	x->ar[j-1][len-1] = '\0';
+
+
 	int childStatus;
 	int childStatus2;
-
 	child = fork();
 	switch(child)
 	{
 		case -1:
-			perror("fork() failed!");
+			perror("fork() failed!\n");
+			fflush(stdout);
 			exit(1);
 			break;
 	
 		case 0:
-			printf("Child PID : %d\n", getpid());
+		//	printf("Child PID : %d\n", getpid());
 			
-			execvp("shell",x->ar);	
-			perror("execvp");
-			exit(2);
+		
+			execute(x->ar);
+
 			break;	
 	
 
 		default:
+		
+		if(x->bg == true)
+		{
 
+			printf("Background process started with PID %d\n", child);
+			fflush(stdout);
+
+
+
+		}
 			child = waitpid(child,&childStatus,0);
-			if(WIFEXITED(childStatus))
+			if(!WIFEXITED(childStatus))
 			{
 				printf("Child exited normally with status %d\n", child,WEXITSTATUS(childStatus));
+				fflush(stdout);
 			}
+
+			
 			
 			break;
 		
@@ -153,7 +177,7 @@ void sighandler(int signum)
 {
 	char* message = " Signal 2 Caught\n";
 	write(STDOUT_FILENO, message, 39);
-	
+	fflush(stdout);
 }
 
 
@@ -185,7 +209,6 @@ void toggleFG(int signum)
 //takes in  integer to process input or out
 void proccessIO(struct Command *x, int i)
 {
-	printf("made it here\n");
 	char* def = "/dev/null";
 	if(i == 3)
 	{
@@ -194,13 +217,13 @@ void proccessIO(struct Command *x, int i)
 		 int sourceFD = open(x->input, O_RDONLY);
  		 if (sourceFD == -1)
 		 { 
-      			perror("source open()"); 
+      			perror("error"); 
     	 	 }
 
 		  int result = dup2(sourceFD, 0);
 	 	 if (result == -1) 
 	         { 
-  			  perror("source dup2()"); 
+  			  perror("error"); 
 		 }
 	
 
@@ -210,12 +233,12 @@ void proccessIO(struct Command *x, int i)
 		int targetFD = open(x->output, O_WRONLY | O_CREAT | O_TRUNC, 0644);
   		if (targetFD == -1) 
 		{ 
-   			 perror("target open()"); 
+   			 perror("error)"); 
  		 }
   		 result = dup2(targetFD, 1);
  		if (result == -1) 
 		{ 
-    			perror("target dup2()"); 
+    			perror("error"); 
 		}
 	}
 	
@@ -227,14 +250,15 @@ void proccessIO(struct Command *x, int i)
 	 int sourceFD = open(x->input, O_RDONLY);
  		 if (sourceFD == -1)
 		 { 
-      			perror("source open()"); 
-      			 
+      			perror("error"); 
+      		
   		}
 
 		  int result = dup2(sourceFD, 0);
 	 	 if (result == -1) 
 		{ 
-  			  perror("source dup2()"); 
+  			  perror("error"); 
+		
    			 
 		  }
 
@@ -248,13 +272,13 @@ void proccessIO(struct Command *x, int i)
 		int targetFD = open(x->output, O_WRONLY | O_CREAT | O_TRUNC, 0644);
   			if (targetFD == -1) 
 			{ 
-   				 perror("target open()"); 
+   				 perror("error"); 
    				 exit(1); 
  			 }
   			int result = dup2(targetFD, 1);
  			if (result == -1) 
 			{ 
-    				perror("target dup2()"); 
+    				perror("error"); 
 	    			exit(2); 
 			  }
 
@@ -387,6 +411,8 @@ void bg(struct Command *x)
 void sta()
 {
 	
+
+
 } 
 
 
@@ -405,7 +431,7 @@ void cd(struct Command *x)
 		strcpy(newFilePath,getenv("HOME"));
 		if(chdir(newFilePath) == -1)
 		{
-			perror("Home");
+			perror("error");
 		}
 		
 	}
@@ -414,7 +440,7 @@ void cd(struct Command *x)
 		sprintf(newFilePath,"/%s",x->ar[1]);
 		if(chdir(newFilePath) == -1)
 		{
-			perror("New Path");
+			perror("error");
 		}
 	}	
 	
@@ -479,14 +505,19 @@ void processCMD()
 	char* line;
 	globalFG = 0;	
 
+	char* kill[50];
+	int c = 0;
+
 	while(counter == 0)
 	{	
 
-
+		char pin[10];
+		sprintf(pin,"%d",getpid());
+	//	printf("%s", pin);
+		
 		showCommand();
 		line = r_line();
 		
-		// for toggle z control
 		if(strlen(line) != 0)
 		{
 			
@@ -495,8 +526,7 @@ void processCMD()
 			pb = processBuilt(cmd);
 			bg(cmd);
 			printf("PID : %d\n", getpid());
-			printf("My parent's pid is %d\n", getppid());
-			printf("%d", pb);
+			fflush(stdout);
 
 			if(pb == 5)
 			{
@@ -510,7 +540,6 @@ void processCMD()
 				{
 					proccessIO(cmd,2);
 
-					//do in or out then fork ex
 				}
 
 				else if(i == 3)
@@ -654,7 +683,8 @@ void execute(char** argv)
 {
   if (execvp(*argv, argv) < 0)
   {
-    perror("Exec failure!");
+    perror("Exec failure!\n");
+	fflush(stdout);
     exit(1);
   }
 }
