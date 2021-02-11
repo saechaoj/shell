@@ -47,7 +47,7 @@ struct Command
 
 
 
-
+//Signal handlers initialized
 int main()
 {
 	struct sigaction SIGINT_action = {0},SIGTSTP_action = {0}, ignore_action = {0};
@@ -428,12 +428,23 @@ void bg(struct Command *x)
 
 
 //Collects and stores last forground exit value or signal flag
-void sta()
+void sta(int c)
 {
+
+	if (WIFEXITED(childExitMethod) != 0) {
+		printf("exit value %d\n", WEXITSTATUS(childExitMethod));
+		fflush(stdout);
+	}
+	if (WIFSIGNALED(childExitMethod) != 0 ) {
+		printf("terminated by signal %d\n", WTERMSIG(childExitMethod));
+		fflush(stdout);
+	}
+	return;
+}
 	
 
 
-} 
+ 
 
 
 
