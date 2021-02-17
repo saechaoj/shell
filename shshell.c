@@ -428,18 +428,18 @@ void bg(struct Command *x)
 
 
 //Collects and stores last forground exit value or signal flag
-void sta(int c)
+void sta()
 {
 
-	if (WIFEXITED(childExitMethod) != 0) {
-		printf("exit value %d\n", WEXITSTATUS(childExitMethod));
-		fflush(stdout);
-	}
-	if (WIFSIGNALED(childExitMethod) != 0 ) {
-		printf("terminated by signal %d\n", WTERMSIG(childExitMethod));
-		fflush(stdout);
-	}
-	return;
+//	if (WIFEXITED(childExitMethod) != 0) {
+//		printf("exit value %d\n", WEXITSTATUS(childExitMethod));
+//		fflush(stdout);
+//	}
+//	if (WIFSIGNALED(childExitMethod) != 0 ) {
+	//	printf("terminated by signal %d\n", WTERMSIG(childExitMethod));
+	//	fflush(stdout);
+	//}
+	//return;
 }
 	
 
